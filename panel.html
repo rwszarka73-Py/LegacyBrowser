@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Legacy Browser</title>
+<link rel="icon" href="/favicon.ico" type="image/png">
+<style>
+:root{color-scheme:light dark;--bg:#f4f5f7;--card:#fff;--fg:#1c1e21;--mut:#667;--line:#dde0e4;--acc:#1b5e8c;--acc2:#e9f1f8;--ok:#1f8a4c;--err:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#16181b;--card:#202327;--fg:#e6e8eb;--mut:#9aa1aa;--line:#33373c;--acc:#6aa9db;--acc2:#1f2b36;--ok:#5cc58a;--err:#f2867e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Ubuntu,Cantarell,sans-serif}
+header{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var(--card);border-bottom:1px solid var(--line)}
+header h1{font-size:19px;margin:0;font-weight:650}
+header .sub{color:var(--mut);font-size:13px}
+header .sp{flex:1}
+main{max-width:980px;margin:0 auto;padding:22px 20px 40px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:18px}
+h2{font-size:15px;margin:0 0 12px;font-weight:650}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input,select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 10px}
+input:focus,select:focus{outline:2px solid var(--acc);outline-offset:-1px}
+button{font:inherit;font-size:14px;border-radius:7px;padding:7px 14px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer}
+button.sec{background:transparent;color:var(--acc)}
+button.ghost{background:transparent;border-color:var(--line);color:var(--mut)}
+button.danger{background:transparent;border-color:var(--line);color:var(--err)}
+button:disabled{opacity:.55;cursor:default}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+tr:last-child td{border-bottom:none}
+td.act{text-align:right;white-space:nowrap}
+td.act button{margin-left:4px;padding:5px 11px}
+.badge{display:inline-block;font-size:12px;padding:1px 8px;border-radius:20px;background:var(--acc2);color:var(--acc)}
+.mono{font-family:ui-monospace,"DejaVu Sans Mono",Menlo,monospace}
+.empty{color:var(--mut);padding:8px 0}
+#log{height:220px;overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font:12.5px/1.5 ui-monospace,"DejaVu Sans Mono",monospace;white-space:pre-wrap}
+#log .e{color:var(--err)} #log .g{color:var(--ok)}
+.note{color:var(--mut);font-size:13px;margin-top:8px}
+.msg{min-height:20px;font-size:13px;margin-top:8px}
+.msg.err{color:var(--err)}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg);padding:20px 22px;width:min(440px,92vw)}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog h3{margin:0 0 14px;font-size:16px}
+dialog label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+dialog input,dialog select{width:100%}
+dialog .chk{display:flex;gap:8px;align-items:center;margin-top:12px;color:var(--fg);font-size:14px}
+dialog .chk input{width:auto}
+dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Legacy Browser</h1>
+    <div class="sub">Old iLO and TLS 1.0/1.1 web interfaces in a modern browser, plus the iLO remote console</div>
+  </div>
+  <div class="sp"></div>
+  <button class="ghost" id="quit">Quit</button>
+</header>
+<main>
+  <section>
+    <h2>Quick connect</h2>
+    <div class="row">
+      <input id="qhost" placeholder="iLO address, e.g. 192.168.1.50" style="flex:1;min-width:220px">
+      <button id="qweb">Open web interface</button>
+      <button class="sec" id="qcon">Remote console</button>
+    </div>
+    <div class="msg" id="qmsg"></div>
+  </section>
+
+  <section>
+    <div class="row" style="margin-bottom:6px">
+      <h2 style="margin:0;flex:1">Saved servers</h2>
+      <button class="sec" id="add">Add server</button>
+    </div>
+    <table>
+      <thead><tr><th>Name</th><th>Address</th><th>Type</th><th></th></tr></thead>
+      <tbody id="list"></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Activity</h2>
+    <div id="log"></div>
+    <div class="note" id="paths"></div>
+  </section>
+</main>
+
+<dialog id="dlgEdit">
+  <form method="dialog" id="fEdit">
+    <h3 id="editTitle">Add server</h3>
+    <input type="hidden" id="eId">
+    <label for="eName">Name</label><input id="eName" placeholder="DL360 G7">
+    <label for="eHost">Address</label><input id="eHost" placeholder="192.168.1.50" required>
+    <label for="eType">Type</label>
+    <select id="eType">
+      <option value="auto">Detect automatically</option>
+      <option value="ilo2">iLO 2</option>
+      <option value="ilo3">iLO 3</option>
+      <option value="web">Web interface only (other device)</option>
+    </select>
+    <label for="eUser">User name</label><input id="eUser" autocomplete="username">
+    <label for="ePass">Password</label><input id="ePass" type="password" autocomplete="current-password" placeholder="Leave blank to ask each time">
+    <div class="chk"><input type="checkbox" id="eRem"><span>Remember password (stored in your settings file)</span></div>
+    <div class="msg err" id="eMsg"></div>
+    <div class="btns"><button type="button" class="ghost" id="eCancel">Cancel</button><button type="submit">Save</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgLogin">
+  <form method="dialog" id="fLogin">
+    <h3 id="loginTitle">Remote console</h3>
+    <label for="lUser">User name</label><input id="lUser" autocomplete="username">
+    <label for="lPass">Password</label><input id="lPass" type="password" autocomplete="current-password">
+    <div class="chk" id="lRemRow"><input type="checkbox" id="lRem"><span>Remember password for this server</span></div>
+    <div class="btns"><button type="button" class="ghost" id="lCancel">Cancel</button><button type="submit">Launch console</button></div>
+  </form>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+let state = {servers: []};
+let pendingConsole = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, {method: opts.body ? 'POST' : 'GET', ...opts,
+    headers: {'X-LB': '1', 'Content-Type': 'application/json'}, body: opts.body ? JSON.stringify(opts.body) : undefined});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+
+function typeLabel(t) { return {ilo2: 'iLO 2', ilo3: 'iLO 3', web: 'Web only'}[t] || 'Auto'; }
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function render() {
+  const tb = $('#list');
+  if (!state.servers.length) {
+    tb.innerHTML = '<tr><td colspan="4" class="empty">No saved servers yet. Use Add server, or Quick connect above.</td></tr>';
+  } else {
+    tb.innerHTML = state.servers.map(s => `<tr>
+      <td>${esc(s.name)}</td><td class="mono">${esc(s.host)}</td><td><span class="badge">${typeLabel(s.type)}</span></td>
+      <td class="act">
+        <button data-a="web" data-id="${s.id}">Web</button>
+        ${s.type === 'web' ? '' : `<button class="sec" data-a="con" data-id="${s.id}">Console</button>`}
+        <button class="ghost" data-a="edit" data-id="${s.id}">Edit</button>
+        <button class="danger" data-a="del" data-id="${s.id}">Delete</button>
+      </td></tr>`).join('');
+  }
+}
+
+function renderLog(lines) {
+  const el = $('#log');
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+  el.innerHTML = lines.map(l => {
+    const cls = /fail|error|refused|couldn't|can't/i.test(l) ? 'e' : /started|connected|logged in|installed|downloaded/i.test(l) ? 'g' : '';
+    return `<div class="${cls}">${esc(l)}</div>`;
+  }).join('');
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+async function refresh(full) {
+  try {
+    const s = await api('/api/state');
+    if (full || JSON.stringify(s.servers) !== JSON.stringify(state.servers)) { state = s; render(); }
+    renderLog(s.log);
+    $('#paths').textContent = 'Settings: ' + s.config + '   ·   Logs and Java: ' + s.data;
+  } catch (e) { $('#log').innerHTML = '<div class="e">Legacy Browser is not running. Start it again from the terminal.</div>'; }
+}
+
+async function openWeb(host, msgEl) {
+  const w = window.open('about:blank', '_blank');   // open now so it isn't blocked as a popup
+  if (msgEl) { msgEl.className = 'msg'; msgEl.textContent = 'Connecting to ' + host + '...'; }
+  try {
+    const r = await api('/api/web?host=' + encodeURIComponent(host));
+    if (w) w.location = r.url; else window.location = r.url;
+    if (msgEl) msgEl.textContent = '';
+  } catch (e) {
+    if (w) w.close();
+    if (msgEl) { msgEl.className = 'msg err'; msgEl.textContent = e.message; }
+    refresh();
+  }
+}
+
+function askLogin(target) {
+  pendingConsole = target;
+  $('#loginTitle').textContent = 'Remote console: ' + (target.name || target.host);
+  $('#lUser').value = target.username || '';
+  $('#lPass').value = '';
+  $('#lRem').checked = false;
+  $('#lRemRow').style.display = target.id ? '' : 'none';
+  $('#dlgLogin').showModal();
+  (target.username ? $('#lPass') : $('#lUser')).focus();
+}
+
+async function startConsole(body) {
+  try { await api('/api/console', {body}); } catch (e) { alertMsg(e.message); }
+  setTimeout(refresh, 400);
+}
+function alertMsg(m) { const q = $('#qmsg'); q.className = 'msg err'; q.textContent = m; }
+
+$('#qweb').onclick = () => { const h = $('#qhost').value.trim(); if (h) openWeb(h, $('#qmsg')); };
+$('#qcon').onclick = () => { const h = $('#qhost').value.trim(); if (h) askLogin({host: h, type: 'auto'}); };
+$('#qhost').addEventListener('keydown', e => { if (e.key === 'Enter') $('#qweb').click(); });
+
+$('#list').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const s = state.servers.find(x => x.id === b.dataset.id); if (!s) return;
+  if (b.dataset.a === 'web') openWeb(s.host, $('#qmsg'));
+  if (b.dataset.a === 'con') {
+    if (s.hasPassword && s.username) startConsole({ID: s.id});
+    else askLogin(s);
+  }
+  if (b.dataset.a === 'edit') openEdit(s);
+  if (b.dataset.a === 'del' && confirm('Delete ' + s.name + '?')) api('/api/delete?id=' + s.id, {method: 'POST', body: {}}).then(() => refresh(true));
+};
+
+function openEdit(s) {
+  $('#editTitle').textContent = s ? 'Edit server' : 'Add server';
+  $('#eId').value = s?.id || ''; $('#eName').value = s?.name || ''; $('#eHost').value = s?.host || '';
+  $('#eType').value = s?.type || 'auto'; $('#eUser').value = s?.username || ''; $('#ePass').value = '';
+  $('#ePass').placeholder = s?.hasPassword ? 'Saved (leave blank to keep)' : 'Leave blank to ask each time';
+  $('#eRem').checked = !!s?.hasPassword; $('#eMsg').textContent = '';
+  $('#dlgEdit').showModal(); $('#eName').focus();
+}
+$('#add').onclick = () => openEdit(null);
+$('#eCancel').onclick = () => $('#dlgEdit').close();
+$('#fEdit').onsubmit = async e => {
+  e.preventDefault();
+  const body = {id: $('#eId').value, name: $('#eName').value.trim(), host: $('#eHost').value.trim(), type: $('#eType').value,
+    username: $('#eUser').value.trim(), password: $('#ePass').value, remember: $('#eRem').checked, clearPassword: !$('#eRem').checked};
+  try { await api('/api/save', {body}); $('#dlgEdit').close(); refresh(true); } catch (err) { $('#eMsg').textContent = err.message; }
+};
+
+$('#lCancel').onclick = () => $('#dlgLogin').close();
+$('#fLogin').onsubmit = e => {
+  e.preventDefault();
+  const t = pendingConsole; $('#dlgLogin').close();
+  startConsole({ID: t.id || '', Host: t.host, Type: t.type || 'auto', Username: $('#lUser').value.trim(), Password: $('#lPass').value, Remember: $('#lRem').checked});
+};
+
+$('#quit').onclick = async () => {
+  if (!confirm('Quit Legacy Browser? Open web interfaces and remote consoles will stop working.')) return;
+  try { await api('/api/quit', {method: 'POST', body: {}}); } catch (e) {}
+  document.body.innerHTML = '<main><section><h2>Legacy Browser has quit.</h2><div class="note">You can close this tab.</div></section></main>';
+};
+
+refresh(true);
+setInterval(refresh, 1500);
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Legacy Browser
+Comment=Old iLO and TLS 1.0/1.1 web interfaces, plus the iLO remote console
+Exec=legacybrowser
+Icon=legacybrowser
+Terminal=false
+Categories=Network;System;
